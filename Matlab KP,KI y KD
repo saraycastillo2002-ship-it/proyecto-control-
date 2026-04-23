@@ -1,0 +1,30 @@
+clc; clear; close all;
+
+s = tf('s');
+
+% Parámetros reales
+L = 0.30;   % barra (m)
+r = 0.40;   % brazo servo (m)
+h = 0.06;   % altura pivote (m)
+g = 9.81;
+
+% Ganancia del sistema
+K = (g*r)/(L*h);
+
+% Sistema realista
+G = K/(s^2 + 0.1*s); % agregamos fricción
+
+% PID
+C = pidtune(G,'PID');
+
+Kp = C.Kp
+Ki = C.Ki
+Kd = C.Kd
+
+% Respuesta
+T = feedback(C*G,1);
+
+figure;
+step(T)
+grid on;
+title('Sistema REAL con geometría incluida');
