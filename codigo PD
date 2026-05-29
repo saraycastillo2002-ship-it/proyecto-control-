@@ -1,0 +1,218 @@
+#include <Servo.h>
+
+#define Umax 66
+#define Umin -66
+
+#define Umax_rad 1.1519
+#define Umin_rad -1.1519
+
+const int echoPin2 = 4;
+const int trigPin2 = 3;
+
+const int echoPin1 = 6;
+const int trigPin1 = 7;
+
+Servo servo;
+
+// VARIABLES
+double setpoint, setpoint_prec;
+double y, y_prec;
+
+double error;
+double error_prec;
+
+// CONTROLADOR ADELANTO TIPO PD
+double U;
+
+// GANANCIAS
+double Kp = 4.5;
+double Kd = 1.8;
+
+// FILTRO DERIVATIVO
+double D = 0;
+double D_prec = 0;
+
+// FUNCIONES
+float measure_1(void);
+float measure_2(void);
+void move_servo(int);
+
+void setup() {
+
+  Serial.begin(9600);
+
+  pinMode(trigPin2, OUTPUT);
+  pinMode(echoPin2, INPUT);
+
+  pinMode(trigPin1, OUTPUT);
+  pinMode(echoPin1, INPUT);
+
+  servo.attach(9);
+
+  delay(1000);
+
+  move_servo(90);
+
+  delay(2000);
+
+  setpoint_prec = measure_2();
+
+  delay(1000);
+
+  y_prec = measure_1();
+
+  delay(1000);
+}
+
+void loop() {
+
+  // REFERENCIA
+  setpoint = measure_2();
+
+  setpoint = 0.53 * setpoint + 0.47 * setpoint_prec;
+
+  delay(20);
+
+  // POSICIÓN DE LA BOLA
+  y = measure_1();
+
+  y = 0.53 * y + 0.47 * y_prec;
+
+  delay(20);
+
+  // ERROR
+  error = round(100 * (y - setpoint)) * 0.01;
+
+  // ZONA MUERTA
+  if (abs(error) < 0.02) {
+    error = 0;
+  }
+
+  // =====================================
+  // CONTROLADOR DE ADELANTO (PD)
+  // =====================================
+
+  // DERIVADA
+  D = (error - error_prec);
+
+  // FILTRO
+  D = 0.6 * D + 0.4 * D_prec;
+
+  // CONTROL
+  U = Kp * error + Kd * D;
+
+  // SATURACIÓN
+  if (U < Umin_rad)
+    U = Umin_rad;
+
+  else if (U > Umax_rad)
+    U = Umax_rad;
+
+  // RAD → GRADOS
+  U = round(U * 180 / M_PI);
+
+  // MAPEO SERVO
+  U = map(U, Umin, Umax, 24, 156);
+
+  // MOVER SERVO
+  move_servo(round(U));
+
+  // SERIAL
+  Serial.print("Bola: ");
+  Serial.print(y * 100);
+
+  Serial.print(" cm  Ref: ");
+  Serial.print(setpoint * 100);
+
+  Serial.print(" cm  U: ");
+  Serial.println(U);
+
+  delay(25);
+
+  // ACTUALIZAR
+  error_prec = error;
+
+  D_prec = D;
+
+  y_prec = y;
+
+  setpoint_prec = setpoint;
+}
+
+// =========================================
+// SENSOR BOLA
+// =========================================
+
+float measure_1(void) {
+
+  long elapsed_time = 0;
+
+  float distance = 0;
+
+  digitalWrite(trigPin1, LOW);
+
+  delayMicroseconds(10);
+
+  digitalWrite(trigPin1, HIGH);
+
+  delayMicroseconds(10);
+
+  digitalWrite(trigPin1, LOW);
+
+  elapsed_time = pulseIn(echoPin1, HIGH);
+
+  distance = round((float)elapsed_time / 58.2);
+
+  delay(30);
+
+  if (distance > 42 || distance < 2) {
+
+    distance = y_prec * 100;
+  }
+
+  return 0.01 * (distance - 1.5 + 0.5);
+}
+
+// =========================================
+// SENSOR REFERENCIA
+// =========================================
+
+float measure_2(void) {
+
+  long elapsed_time = 0;
+
+  float distance = 0;
+
+  digitalWrite(trigPin2, LOW);
+
+  delayMicroseconds(10);
+
+  digitalWrite(trigPin2, HIGH);
+
+  delayMicroseconds(10);
+
+  digitalWrite(trigPin2, LOW);
+
+  elapsed_time = pulseIn(echoPin2, HIGH);
+
+  distance = (float)elapsed_time / 58.2;
+
+  delay(30);
+
+  if (distance > 42)
+    distance = 43;
+
+  else if (distance < 0)
+    distance = 0;
+
+  return 0.01 * (distance + 2);
+}
+
+// =========================================
+// SERVO
+// =========================================
+
+void move_servo(int u) {
+
+  servo.write(u - map(u, 30, 150, 14, 3));
+}
