@@ -1,0 +1,83 @@
+clc; clear; close all;
+
+%% === 1. PARÁMETROS FÍSICOS DEL SISTEMA ===
+L = 0.30;       % longitud barra (m)
+r  = 0.40;      % brazo servo (m)
+h  = 0.06;      % altura pivote (m)
+g  = 9.81;      % gravedad (m/s²)
+
+%% === 2. GANANCIA Y PLANTA ===
+K   = (g * r) / (L * h);           % K = 218
+num = K;
+den = [1, 0.1, 0];                  % s² + 0.1s
+G   = tf(num, den);
+
+%% === 3. CONTROLADOR PID (valores sintonizados en Matlab) ===
+Kp = 9;
+Ki = 1.5;
+Kd = 2;
+C  = pid(Kp, Ki, Kd);
+
+%% === 4. SISTEMA EN LAZO CERRADO ===
+T = feedback(C * G, 1);
+
+% ---- Imprimir resumen en consola -------------------------
+fprintf('\n========== RESUMEN DEL SISTEMA ==========\n');
+fprintf('K planta          = %.4f\n', K);
+fprintf('Planta G(s)       = %.0f / (s² + 0.1s)\n', K);
+fprintf('Kp = %.1f | Ki = %.1f | Kd = %.1f\n', Kp, Ki, Kd);
+[Gm, Pm, ~, Wpm] = margin(C * G);
+fprintf('Margen de Ganancia = %.2f dB\n', 20*log10(Gm));
+fprintf('Margen de Fase     = %.2f deg\n', Pm);
+fprintf('Frec. de corte     = %.4f rad/s\n', Wpm);
+fprintf('==========================================\n\n');
+
+% ==========================================================
+%  GRÁFICA 1 — RESPUESTA AL ESCALÓN (Sintonización)
+% ==========================================================
+figure(1);
+step(T);
+title('Respuesta al Escalón — Sistema con PID Sintonizado', ...
+      'FontSize', 13, 'FontWeight', 'bold');
+xlabel('Tiempo (s)', 'FontSize', 11);
+ylabel('Posición (m)', 'FontSize', 11);
+grid on;
+legend('Salida del sistema', 'Location', 'southeast');
+
+% ==========================================================
+%  GRÁFICA 2 — BODE LAZO ABIERTO  C(s)·G(s)
+% ==========================================================
+figure(2);
+bode(C * G);
+title('Diagrama de Bode — Lazo Abierto C(s)·G(s)', ...
+      'FontSize', 13, 'FontWeight', 'bold');
+grid on;
+
+% ==========================================================
+%  GRÁFICA 3 — BODE LAZO CERRADO  T(s)
+% ==========================================================
+figure(3);
+bode(T);
+title('Diagrama de Bode — Lazo Cerrado T(s)', ...
+      'FontSize', 13, 'FontWeight', 'bold');
+grid on;
+
+% ==========================================================
+%  GRÁFICA 4 — MÁRGENES DE ESTABILIDAD
+% ==========================================================
+figure(4);
+margin(C * G);
+title('Márgenes de Estabilidad — Margen de Fase y Ganancia', ...
+      'FontSize', 13, 'FontWeight', 'bold');
+grid on;
+
+% ==========================================================
+%  GRÁFICA 5 — LUGAR GEOMÉTRICO DE LAS RAÍCES
+% ==========================================================
+figure(5);
+rlocus(C * G);
+title('Lugar Geométrico de las Raíces', ...
+      'FontSize', 13, 'FontWeight', 'bold');
+grid on;
+
+fprintf('✓ Las 5 gráficas fueron generadas correctamente.\n\n');
